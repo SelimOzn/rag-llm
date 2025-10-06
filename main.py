@@ -6,6 +6,10 @@ import os
 from pipeline import add_context, process_title, concurrent_chunker, hybrid_chunker
 from utils import split_pdf_by_title, has_surrounding_whitespace, save_jsonl
 import shutil
+from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
+from rank_bm25 import BM25Okapi
+
 
 if __name__ == '__main__':
     token = os.getenv("HUGGINGFACE_HUB_TOKEN")
@@ -40,6 +44,7 @@ if __name__ == '__main__':
     context_tokenizer = AutoTokenizer.from_pretrained(context_model_name, token=token)
     context_model = AutoModelForCausalLM.from_pretrained(context_model_name, token=token)
     generator = pipeline("text-generation", model=context_model, tokenizer=context_tokenizer)
+    bm25_vectorizer = TfidfVectorizer()
 
     for i, file in enumerate(os.listdir(doc_dir_path)):
         doc_path = os.path.join(doc_dir_path, file)
@@ -53,8 +58,17 @@ if __name__ == '__main__':
                                     similarity_threshold=SIMILARITY_THRESHOLD)
 
         for chunk in chunks:
-            contexted_chunk = add_context(chunk, doc, generator, prompt_template)
+            contexted_chunk = add_context(chunk["chunk"], doc, generator, prompt_template)
             save_jsonl(contexted_chunk, contexted_save_path)
+
+    all_chunks = []
+    with open(contexted_save_path, "r") as f:
+        for line in f:
+            contexted_chunk = json.loads(line)
+            all_chunks.extend(contexted_chunk["chunk"].lower().split())
+    bm25 = BM25Okapi(all_chunks)
+
+
 
 
 
