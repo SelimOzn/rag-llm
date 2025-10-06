@@ -1,13 +1,11 @@
 from concurrent.futures import ProcessPoolExecutor
-from typing import List
-from nltk.metrics.aline import similarity_matrix
 from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer
 import nltk
 nltk.download("punkt_tab")
 from nltk.tokenize import sent_tokenize
 import os
-from doc_process import save_jsonl
+from utils.pdf_utils import save_jsonl
 import json
 import functools
 
@@ -55,7 +53,7 @@ def hybrid_chunker(
 def process_title(entry, tokenizer, model, similarity_threshold, max_tokens):
     title = entry["title"]
     content = entry["content"]
-
+    doc_id = entry["doc_id"]
 
     chunks = hybrid_chunker(content,
                             emb_model=model,
@@ -63,21 +61,18 @@ def process_title(entry, tokenizer, model, similarity_threshold, max_tokens):
                             similarity_threshold=similarity_threshold,
                             max_tokens=max_tokens)
 
-    return [{"title":title, "chunk_id":i, "chunk":chunk}
+    return [{"doc_id":doc_id, "title":title, "chunk_id":i, "chunk":chunk}
             for i,chunk in enumerate(chunks)]
 
 
-def concurrent_chunker(title_file,
+def concurrent_chunker(entries,
                        save_file,
                        emb_model,
                        tokenizer,
                        similarity_threshold=0.85,
                        max_tokens=200):
 
-    entries = []
-    with open(title_file, "r", encoding="utf-8") as f:
-        for line in f:
-            entries.append(json.loads(line))
+
 
     results = []
     chunker_fuck = functools.partial(
@@ -99,15 +94,19 @@ if __name__ == "__main__":
     token = os.getenv("HUGGINGFACE_HUB_TOKEN")
     embed_model_name = "sentence-transformers/all-MiniLM-L6-v2"
     tokenizer_name = "meta-llama/Llama-3.1-8B-Instruct"
-    title_file_path = "saves/titles.jsonl"
-    chunk_save_path = "saves/chunks.jsonl"
+    title_file_path = "../saves/titles.jsonl"
+    chunk_save_path = "../saves/chunks.jsonl"
     MAX_TOKENS = 200
     SIMILARITY_THRESHOLD = 0.5
+    entries = []
+    with open(title_file_path, "r") as f:
+        for line in f:
+            entries.append(json.loads(line))
 
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, token=token)
     embed_model = SentenceTransformer(embed_model_name)
 
-    chunks = concurrent_chunker(title_file_path,
+    chunks = concurrent_chunker(entries,
                                 chunk_save_path,
                                 emb_model=embed_model,
                                 tokenizer=tokenizer,
