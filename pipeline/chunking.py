@@ -9,6 +9,7 @@ from utils.pdf_utils import save_jsonl
 import json
 import functools
 
+id = 0
 def hybrid_chunker(
     text,
     emb_model,
@@ -60,11 +61,31 @@ def process_title(entry, tokenizer, model, similarity_threshold, max_tokens):
                             tokenizer=tokenizer,
                             similarity_threshold=similarity_threshold,
                             max_tokens=max_tokens)
+    global id
+    metadata = []
+    for i, chunk in enumerate(chunks):
+        id+=1
+        metadata.append({"doc_id": doc_id, "title": title, "chunk_id": str(id), "chunk": chunk})
+    return metadata
 
-    return [{"doc_id":doc_id, "title":title, "chunk_id":i, "chunk":chunk}
-            for i,chunk in enumerate(chunks)]
 
 
+def concurrent_chunker(entries,
+                       save_file,
+                       emb_model,
+                       tokenizer,
+                       similarity_threshold=0.85,
+                       max_tokens=200):
+
+    results = []
+
+    for entry in entries:
+        results.extend(process_title(entry, tokenizer, emb_model, similarity_threshold, max_tokens))
+
+    save_jsonl(results, save_file)
+    return results
+
+"""
 def concurrent_chunker(entries,
                        save_file,
                        emb_model,
@@ -88,7 +109,7 @@ def concurrent_chunker(entries,
             results.extend(out)
 
     save_jsonl(results, save_file)
-    return results
+    return results"""
 
 if __name__ == "__main__":
     token = os.getenv("HUGGINGFACE_HUB_TOKEN")
