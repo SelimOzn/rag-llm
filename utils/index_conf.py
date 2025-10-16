@@ -63,18 +63,14 @@ def dense_index_upsert(pc, index_name, embeddings, metadatas):
 # -----------------------------
 # 4️⃣ Sparse Index Upsert
 # -----------------------------
-def sparse_index_upsert(pc, index_name, sparse_vectors, metadatas):
+def sparse_index_upsert(pc, index_name, sparse_vectors):
     """
     Sparse vectorleri indexe upsert eder.
     sparse_vectors: dict listesi {"indices": [...], "values": [...]}
     metadatas: her vector için dictionary
     """
     index = pc.Index(index_name)
-    to_upsert = [
-        (meta["chunk_id"], {"indices": sv["indices"], "values": sv["values"]}, meta)
-        for sv, meta in zip(sparse_vectors, metadatas)
-    ]
-    index.upsert(vectors=to_upsert)
+    index.upsert(vectors=sparse_vectors)
     print(f"[↑] Upserted {len(sparse_vectors)} sparse vectors.")
 
 

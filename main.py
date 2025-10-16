@@ -13,6 +13,7 @@ from utils import (split_pdf_by_title,
                    sparse_index_upsert,
                    dense_index_query,
                    sparse_index_query)
+from tqdm import tqdm
 import shutil
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
@@ -96,25 +97,38 @@ if __name__ == '__main__':
             save_jsonl([contexted_chunk], contexted_save_path)
 
     all_chunks = []
+    metadata = []
     with open(contexted_save_path, "r") as f:
         for line in f:
             contexted_chunk = json.loads(line)
             contexted_text = contexted_chunk["chunk"]
             tokens = re.findall(r'\w+', contexted_text.lower())
-            all_chunks.append([tokens, contexted_chunk])
+            all_chunks.append(tokens)
+            metadata.append(contexted_chunk)
 
     bm25 = BM25Okapi(all_chunks)
     create_sparse_index(pc, SPARSE_INDEX_NAME)
     sparse_vectors = []
-    for i, chunk in enumerate(all_chunks):
-        tokens = chunk[0]
-        token_scores = {token: bm25.get_scores([token])[0] for token in set(tokens)}
-        sparse_vectors.append({
-            "id":f"chunk_{i}",
-            "values": token_scores,
-            "metadata": chunk[1]
-        })
+    for i, tokens in enumerate(tqdm(all_chunks, desc="Creating sparse vectors")):
+        token_weights = {}
+        for token in set(tokens):
+            tf = tokens.count(token)
+            idf = bm25.idf.get(token, 0)
+            token_weights[token] = tf * idf  # BM25 skorunun temel hali
 
+        # Pinecone formatına çevir
+        indices = list(range(len(token_weights)))  # gerçek token ID'leri tokenizer'dan alınabilir
+        values = list(token_weights.values())
+
+        sparse_vectors.append({
+            "id": f"chunk_{i}",
+            "sparse_values": {
+                "indices": indices,
+                "values": values
+            },
+            "metadata": metadata[i]
+        })
+    sparse_index_upsert(pc, SPARSE_INDEX_NAME, sparse_vectors)
 
 
 
