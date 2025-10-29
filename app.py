@@ -8,13 +8,12 @@ from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from transformers import AutoTokenizer, pipeline
 import os
-from utils import (init_pinecone,
-                   dense_index_query,
-                   sparse_index_query,
-                   config,
-                   normalize_scores,
-                   hybrid_search)
 import gradio as gr
+from typing import Dict, Any, Optional
+from utils import (init_pinecone,
+                   config,
+                   hybrid_search,
+                   run_rebuild)
 
 def create_rag_tool(
         pc,
@@ -52,13 +51,11 @@ def create_rag_tool(
     return doc_search_tool
 
 print("Global state (modeller, agent) yükleniyor... Lütfen bekleyin.")
-GLOBAL_STATE = {}
+GLOBAL_STATE: Dict[str, Any] = {}
 
 try:
     GLOBAL_STATE["pc"] = init_pinecone(config.PINECONE_API_KEY)
     GLOBAL_STATE["embed_model"] = SentenceTransformer(config.EMBED_MODEL_NAME)
-    GLOBAL_STATE["vectorizer"] = joblib.load(config.VECTORIZER_FILE_PATH)
-
     GLOBAL_STATE["llm"] = ChatGoogleGenerativeAI(model=config.AGENT_LLM_MODEL,
                                  temperature=0.5,
                                  google_api_key=config.GOOGLE_API_KEY)
@@ -71,22 +68,27 @@ try:
         top_p=0.9,
         truncation=True
     )
-    rag_tool = create_rag_tool(GLOBAL_STATE["pc"],
-                               GLOBAL_STATE["embed_model"],
-                               GLOBAL_STATE["vectorizer"])
-    tools = [rag_tool]
+    try:
+        GLOBAL_STATE["vectorizer"] = joblib.load(config.VECTORIZER_FILE_PATH)
+        rag_tool = create_rag_tool(GLOBAL_STATE["pc"],
+                                   GLOBAL_STATE["embed_model"],
+                                   GLOBAL_STATE["vectorizer"])
+        tools = [rag_tool]
+        GLOBAL_STATE["agent"] = create_agent(GLOBAL_STATE["llm"],
+                                             tools,
+                                             system_prompt=config.AGENT_SYSTEM_PROMPT)
+        print("Agent ve tüm modeller başarıyla yüklendi. Arayüz başlatılmaya hazır.")
+    except FileNotFoundError:
+        print(f"Uyarı: '{config.VECTORIZER_FILE_PATH}' bulunamadı.")
+        print("Sistem 'devre dışı' modda başlıyor. Lütfen bir dosya yükleyerek ilk indekslemeyi başlatın.")
+        GLOBAL_STATE["vectorizer"] = None
+        GLOBAL_STATE["agent"] = None
 
-    GLOBAL_STATE["agent"] = create_agent(GLOBAL_STATE["llm"], tools, system_prompt=config.AGENT_SYSTEM_PROMPT)
-    print("Agent ve tüm modeller başarıyla yüklendi. Arayüz başlatılmaya hazır.")
-
-except FileNotFoundError:
-    print(f"Hata: '{config.VECTORIZER_FILE_PATH}' bulunamadı.")
-    print("Lütfen önce 'build_index.py' betiğini çalıştırarak indeksleri oluşturun.")
-    sys.exit(1)
 except Exception as e:
     print(f"Modeller yüklenirken bir hata oluştu: {e}")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
-
 
 
 def respond(message, chat_history):
@@ -126,16 +128,56 @@ def upload_and_reindex(file, chat_history):
 
         chat_history.append((f"({file_name} yüklendi)", "Dosya alındı. İndeksleme başlıyor... Bu işlem birkaç dakika sürebilir. Lütfen bekleyin..."))
         yield "", chat_history
+
     except Exception as e:
         print(f"Dosya kopyalanamadı: {e}")
         chat_history.append((None,f"Hata: Dosya kopyalanamadı: {e}"))
         yield "", chat_history
         return
 
-    print("İndeksleme süreci ('build_index.py') başlatılıyor...")
+    print("İndeksleme süreci ('run_rebuild.py') başlatılıyor...")
     try:
+        run_rebuild(
+            GLOBAL_STATE["pc"],
+            GLOBAL_STATE["tokenizer"],
+            GLOBAL_STATE["embed_model"],
+            GLOBAL_STATE["generator"]
+        )
 
+        print("İndeksleme tamamlandır.")
+        chat_history.append((None, "İndeksleme tamamlandı. Modeller hafızada güncelleniyor..."))
+        yield "", chat_history
+    except Exception as e:
+        print(f"İndeksleme hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        chat_history.append((None, f"Hata: İndeksleme başarısız oldu.\n{e}"))
+        yield "", chat_history
+        return
 
+    print("Modeller hafızada dinamik olarak yeniden yükleniyor...")
+    try:
+        GLOBAL_STATE["vectorizer"] = joblib.load(config.VECTORIZER_FILE_PATH)
+
+        new_rag_tool = create_rag_tool(
+            GLOBAL_STATE["pc"],
+            GLOBAL_STATE["embed_model"],
+            GLOBAL_STATE["vectorizer"]
+        )
+        GLOBAL_STATE["agent"] = create_agent(
+            GLOBAL_STATE["llm"],
+            [new_rag_tool],
+            system_prompt=config.AGENT_SYSTEM_PROMPT
+        )
+
+        print("Hafızadaki agent başarıyla güncellendi.")
+        chat_history.append((None, f"Sistem başarıyla güncellendi. Artık '{file_name}' hakkında soru sorabilirsiniz."))
+        yield "", chat_history
+
+    except Exception as e:
+        print(f"Modeller yeniden yüklenirken hata oluştu: {e}")
+        chat_history.append((None, f"HATA: Modeller hafızaya yeniden yüklenemedi. Lütfen uygulamayı manuel olarak yeniden başlatın. Hata: {e}"))
+        yield "", chat_history
 
 
 if __name__ == "__main__":

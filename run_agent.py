@@ -10,7 +10,7 @@ from utils import (init_pinecone,
                    config,
                    normalize_scores,
                    hybrid_search)
-
+# Terminalde çalışan uygulama. Buradan fonksiyon kullanma
 def create_rag_tool(
         pc,
         embed_model,

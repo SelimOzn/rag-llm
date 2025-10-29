@@ -8,3 +8,4 @@ from .index_conf import (create_sparse_index,
                          dense_index_query,
                          sparse_index_query)
 from .rag_core import hybrid_search, normalize_scores
+from .index_manager import run_rebuild
