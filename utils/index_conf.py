@@ -29,17 +29,17 @@ def create_dense_index(pc, dense_index_name, dense_vector_dim):
         print(f"[✓] Dense index already exists: {dense_index_name}")
 
 def create_sparse_index(pc, sparse_index_name):
-    if not pc.has_index(sparse_index_name):
-        print(f"[+] Creating sparse index: {sparse_index_name}")
-        pc.create_index(
-            name=sparse_index_name,
-            vector_type="sparse",
-            metric="dotproduct",
-            spec=ServerlessSpec(cloud="aws", region="us-east-1"),
-            deletion_protection="disabled",
-        )
-    else:
-        print(f"[✓] Dense index already exists: {sparse_index_name}")
+    if pc.has_index(sparse_index_name):
+        print(f"Deleting current sparse index: {sparse_index_name}")
+        pc.delete_index(sparse_index_name)
+    print(f"[+] Creating sparse index: {sparse_index_name}")
+    pc.create_index(
+        name=sparse_index_name,
+        vector_type="sparse",
+        metric="dotproduct",
+        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+        deletion_protection="disabled",
+    )
 
 # -----------------------------
 # 3️⃣ Dense Index Upsert
