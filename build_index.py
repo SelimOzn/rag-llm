@@ -82,14 +82,14 @@ def build_vector_stores():
         sparse_matrix = vectorizer.transform([chunk_text])
         indices = sparse_matrix.indices.tolist()
         values = sparse_matrix.data.tolist()
-
+        curr_metadata = metadata[i]
         sparse_vectors_batch.append({
-            "id":metadata[i]["chunk_id"],
+            "id":curr_metadata["chunk_id"],
             "sparse_values":{
                 "indices":indices,
                 "values":values,
             },
-            "metadata":metadata[i]
+            "metadata":curr_metadata
         })
 
         if len(sparse_vectors_batch) >= config.SPARSE_BATCH_SIZE or i==len(all_chunks_text)-1:

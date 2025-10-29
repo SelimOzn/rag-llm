@@ -47,7 +47,7 @@ def hybrid_search(
         }
 
     for r in sparse_matches:
-        if r["id"] in sparse_matches:
+        if r["id"] in all_results:
             all_results[r["id"]]["sparse_score"] = r["normalized_score"]
         else:
             all_results[r["id"]] = {
