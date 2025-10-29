@@ -1,11 +1,10 @@
 import json
-import re
-from typing import final
 from functools import partial
-from sentence_transformers import SentenceTransformer, util
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, pipeline
 import os
-from pipeline import add_context, process_title, concurrent_chunker, hybrid_chunker
+import numpy as np
+from pipeline import add_context, concurrent_chunker
 from utils import (split_pdf_by_title,
                    save_jsonl,
                    create_dense_index,
@@ -15,6 +14,9 @@ from utils import (split_pdf_by_title,
                    sparse_index_upsert,
                    dense_index_query,
                    sparse_index_query)
+from dotenv import load_dotenv
+from langchain.agents import create_agent
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tqdm import tqdm
 import shutil
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -27,7 +29,7 @@ def normalize_scores(results):
     if not results:
         return []
 
-    scores = [r["scores"] for r in results]
+    scores = [r["score"] for r in results]
     min_s, max_s = min(scores), max(scores)
 
     if max_s - min_s == 0:
@@ -36,7 +38,7 @@ def normalize_scores(results):
         return results
 
     for r in results:
-        r["normalized_score"] = (r["scores"] - min_s) / (max_s - min_s)
+        r["normalized_score"] = (r["score"] - min_s) / (max_s - min_s)
     return results
 
 def hybrid_search(
@@ -90,50 +92,56 @@ def hybrid_search(
         })
 
     final_ranked_list.sort(key=lambda x:x["hybrid_score"], reverse=True)
+    print("eşleşmeler", final_ranked_list)
     return final_ranked_list
+
 
 def create_rag_tool(
         pc,
         embed_model,
         vectorizer,
-        dense_index_name = "rag_dense",
-        sparse_index_name = "rag_sparse",
+        dense_index_name = "rag-dense",
+        sparse_index_name = "rag-sparse",
         top_k=5,
         alpha=0.5,
 ):
-    doc_search_func = partial(
-        hybrid_search,
-        pc = pc,
-        embed_model = embed_model,
-        vectorizer = vectorizer,
-        dense_index_name = dense_index_name,
-        sparse_index_name = sparse_index_name,
-        top_k = top_k,
-        alpha = alpha,
-    )
+    def wrapped_hybrid_search(query):
+        results = hybrid_search(
+            query=query,
+            pc=pc,
+            embed_model=embed_model,
+            vectorizer=vectorizer,
+            dense_index_name=dense_index_name,
+            sparse_index_name=sparse_index_name,
+            top_k=top_k,
+            alpha=alpha,
+        )
+        # agent'in işleyebilmesi için string olarak döndür
+        return json.dumps(results, ensure_ascii=False)
 
     doc_search_tool = Tool(
         name="DocumentHybridSearch",
-        func=doc_search_func,
-        description="""
-        Kullanıcı şirket içi belgeler, teknik konular veya PDF'ler hakkında spesifik bir soru sorduğunda bu aracı kullan. 
-        Genel bilgi, sohbet veya güncel hava durumu/haberler için kullanma. 
-        Girdi olarak sadece kullanıcının sorgu metnini (string) alır.
-        """
+        func=wrapped_hybrid_search,
+        description=(
+            """
+                    Kullanıcı şirket içi belgeler, teknik konular veya PDF'ler hakkında spesifik bir soru sorduğunda bu aracı kullan.
+                    Genel bilgi, sohbet veya güncel hava durumu/haberler için kullanma.
+                    Girdi olarak sadece kullanıcının sorgu metnini (string) alır.
+                    """
+        ),
     )
-
     return doc_search_tool
 
 def rag_system_init(
-        vectorizer_path="sparse_vectorizer",
+        vectorizer_path="./sparse_vectorizer/",
         embed_model_name="sentence-transformers/all-MiniLM-L6-v2",
         DENSE_INDEX_NAME="rag-dense",
         SPARSE_INDEX_NAME="rag-sparse"
 ):
+    load_dotenv()
     token = os.getenv("HUGGINGFACE_HUB_TOKEN")
     tokenizer_name = "meta-llama/Llama-3.1-8B-Instruct"
     context_model_name = "meta-llama/Llama-3.2-1B-Instruct"
-    title_file_path = "saves/titles.jsonl"
     chunk_save_path = "saves/chunks.jsonl"
     contexted_save_path = "saves/contexts.jsonl"
     MAX_TOKENS = 200
@@ -192,7 +200,7 @@ def rag_system_init(
 
     all_chunks_text = []
     metadata = []
-    with open(contexted_save_path, "r") as f:
+    with open(contexted_save_path, "r", encoding="utf-8") as f:
         for line in f:
             contexted_chunk = json.loads(line)
             contexted_text = contexted_chunk["chunk"]
@@ -202,13 +210,12 @@ def rag_system_init(
     vectorizer = TfidfVectorizer(
         lowercase=True,
         stop_words=None,
-        dtype=float
+        dtype=np.float64
     )
     vectorizer.fit(all_chunks_text)
 
-    if os.path.exists(vectorizer_path):
-        shutil.rmtree(vectorizer_path)
-    joblib.dump(vectorizer, vectorizer_path)
+    os.makedirs(vectorizer_path, exist_ok=True)
+    joblib.dump(vectorizer, os.path.join(vectorizer_path, "vectorizer.joblib"))
 
     create_sparse_index(pc, SPARSE_INDEX_NAME)
     sparse_vectors_batch = []
@@ -232,4 +239,67 @@ def rag_system_init(
             sparse_vectors_batch = []
 
     print("Sparse vektörler başarıyla yüklendi")
+    return pc, embed_model, vectorizer
+
+
+if __name__ == "__main__":
+    load_dotenv()
+    pinecone_api_key = os.getenv("PINECONE_API_KEY")
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    pc, embed_model, vectorizer = rag_system_init()
+
+    rag_tool = create_rag_tool(pc,
+                               embed_model,
+                               vectorizer)
+    model_name = "gemini-2.0-flash"
+    llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.5, google_api_key=google_api_key)
+
+    print("Araç oluşturuluyor...")
+    tools = [rag_tool]
+
+    system_prompt = """
+    Sen, belge tabanlı soruları yanıtlayan bir asistansın.
+    Kullanıcı bir soru sorduğunda, görevin cevabı DocumentHybridSearch aracını 
+    kullanarak bulmaktır. 
+    Sana verilen JSON string'i (arama sonuçlarını) kullanarak kullanıcıya 
+    doğal dilde bir cevap oluştur.
+    Cevabı bilmediğini varsayma, HER ZAMAN önce arama aracını kullan.
+    """
+
+    # --- 3. AGENT'I OLUŞTURUN (PROMPT OLMADAN) ---
+    print("Agent (çalıştırıcı) kuruluyor...")
+
+    # create_agent fonksiyonu, 'prompt' olmadan çağrıldığında
+    # ve model (Gemini) tool-calling'i desteklediğinde,
+    # 'agent_runnable' zaten tam bir çalıştırıcı (executor) olur.
+    agent_runnable = create_agent(llm, tools, system_prompt=system_prompt)
+
+    # --- agent_executor = AgentExecutor(...) SATIRINI TAMAMEN SİLİN ---
+
+    # --- 4. DOĞRUDAN 'agent_runnable'I ÇAĞIRIN ---
+    print("Agent çalıştırılıyor...")
+    query = "What is a theoretical framework for understanding the Scaled Dot-Product Attention (SDPA) mechanism?"
+
+    # Çağırma formatı: "messages"
+    result = agent_runnable.invoke({
+        "messages": [
+            ("user", query)
+        ]
+    })
+
+    print("\n--- AGENT'IN NİHAİ CEVABI ---")
+    # Çıktı formatı değişmiş olabilir, 'output' yerine 'messages' listesini kontrol edin
+    if 'output' in result:
+        print(result['output'])
+    elif 'messages' in result and result['messages']:
+        # Genellikle son mesaj (AIMessage) cevabı içerir
+        print(result['messages'][-1].content)
+    else:
+        print(result)
+
+
+
+
+
+
 

@@ -77,11 +77,11 @@ def sparse_index_upsert(pc, index_name, sparse_vectors):
 
 def dense_index_query(pc, index_name, query_vector, top_k=5):
     index = pc.Index(index_name)
-    result = index.query(vector=query_vector.tolist(), top_k=top_k, include_metadata=True)
+    result = index.query(vector=query_vector, top_k=top_k, include_metadata=True)
     return result
 
 
-def sparse_index_query(pc, index_name, sparse_query, top_k=5):
+def sparse_index_query(pc, index_name, sparse_vector, top_k=5):
     index = pc.Index(index_name)
-    result = index.query(sparse_query=sparse_query, top_k=top_k, include_metadata=True)
+    result = index.query(sparse_vector=sparse_vector, top_k=top_k, include_metadata=True)
     return result

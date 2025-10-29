@@ -1,4 +1,3 @@
-from concurrent.futures import ProcessPoolExecutor
 from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer
 import nltk
@@ -7,7 +6,6 @@ from nltk.tokenize import sent_tokenize
 import os
 from utils.pdf_utils import save_jsonl
 import json
-import functools
 
 id = 0
 def hybrid_chunker(

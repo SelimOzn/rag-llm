@@ -1,6 +1,4 @@
 import fitz
-from sympy.physics.units import current
-from torch.ao.nn.quantized.functional import threshold
 import json
 import os
 from .io_utils import save_jsonl
