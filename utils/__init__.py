@@ -7,3 +7,4 @@ from .index_conf import (create_sparse_index,
                          sparse_index_upsert,
                          dense_index_query,
                          sparse_index_query)
+from .rag_core import hybrid_search, normalize_scores

@@ -84,7 +84,7 @@ def build_vector_stores():
         values = sparse_matrix.data.tolist()
 
         sparse_vectors_batch.append({
-            "id":f"chunk_{i}",
+            "id":metadata[i]["chunk_id"],
             "sparse_values":{
                 "indices":indices,
                 "values":values,
