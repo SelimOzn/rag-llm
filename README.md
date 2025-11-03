@@ -110,18 +110,18 @@ rag-llm/
 ├── README.md                   # Bu döküman
 │
 ├── pipeline/
-│ ├── __init__.py                   # Pipeline modüllerini import edilebilir hale getirir
-│ ├── chunking.py               # Anlamsal parçalama (semantic chunking) mantığını içerir
-│ └── contextualize.py          # LLM ile parçalara bağlam ekleme mantığını içerir
+│   ├── __init__.py             # Pipeline modüllerini import edilebilir hale getirir
+│   ├── chunking.py             # Anlamsal parçalama (semantic chunking) mantığını içerir
+│   └── contextualize.py        # LLM ile parçalara bağlam ekleme mantığını içerir
 │
 ├── utils/
-│ ├── __init__.py                   # Yardımcı fonksiyonları import edilebilir hale getirir
-│ ├── config.py                 # Tüm konfigürasyonları, API anahtarlarını ve dosya yollarını yönetir
-│ ├── index_conf.py             # Pinecone indekslerini oluşturma, silme ve sorgulama fonksiyonları
-│ ├── index_manager.py          # Tüm veri işleme (ingestion) pipeline’ını (run_rebuild) yönetir
-│ ├── io_utils.py               # JSONL dosyalarına yazma gibi I/O işlemleri
-│ ├── pdf_utils.py              # PDF dosyalarını ayrıştıran (parsing) fonksiyonlar
-│ └── rag_core.py               # Hibrit arama (hybrid_search) ve skor normalleştirme mantığı
+│   ├── __init__.py             # Yardımcı fonksiyonları import edilebilir hale getirir
+│   ├── config.py               # Tüm konfigürasyonları, API anahtarlarını ve dosya yollarını yönetir
+│   ├── index_conf.py           # Pinecone indekslerini oluşturma, silme ve sorgulama fonksiyonları
+│   ├── index_manager.py        # Tüm veri işleme (ingestion) pipeline’ını (run_rebuild) yönetir
+│   ├── io_utils.py             # JSONL dosyalarına yazma gibi I/O işlemleri
+│   ├── pdf_utils.py            # PDF dosyalarını ayrıştıran (parsing) fonksiyonlar
+│   └── rag_core.py             # Hibrit arama (hybrid_search) ve skor normalleştirme mantığı
 │
 ├── docs/                       # (Dinamik) Yüklenecek PDF'lerin konulduğu klasör
 ├── processed_docs/             # (Dinamik) İşlemi tamamlanan PDF'lerin taşındığı klasör
