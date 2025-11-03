@@ -106,26 +106,26 @@ Projenin ana dizin yapısı ve önemli dosyaların açıklamaları aşağıdadı
 ```
 rag-llm/
 │
-├── app.py # Gradio arayüzünü başlatan ve agent'ı yükleyen ana uygulama dosyası
-├── docker-compose.yml # (Opsiyonel) Pinecone local test servislerini başlatmak için
-├── README.md # Bu döküman
+├── app.py                      # Gradio arayüzünü başlatan ve agent'ı yükleyen ana uygulama dosyası
+├── docker-compose.yml          # (Opsiyonel) Pinecone local test servislerini başlatmak için
+├── README.md                   # Bu döküman
 │
 ├── pipeline/
-│ ├── init.py # Pipeline modüllerini import edilebilir hale getirir
-│ ├── chunking.py # Anlamsal parçalama (semantic chunking) mantığını içerir
-│ └── contextualize.py # LLM ile parçalara bağlam ekleme mantığını içerir
+│ ├── init.py                   # Pipeline modüllerini import edilebilir hale getirir
+│ ├── chunking.py               # Anlamsal parçalama (semantic chunking) mantığını içerir
+│ └── contextualize.py          # LLM ile parçalara bağlam ekleme mantığını içerir
 │
 ├── utils/
-│ ├── init.py # Yardımcı fonksiyonları import edilebilir hale getirir
-│ ├── config.py # Tüm konfigürasyonları, API anahtarlarını ve dosya yollarını yönetir
-│ ├── index_conf.py # Pinecone indekslerini oluşturma, silme ve sorgulama fonksiyonları
-│ ├── index_manager.py # Tüm veri işleme (ingestion) pipeline’ını (run_rebuild) yönetir
-│ ├── io_utils.py # JSONL dosyalarına yazma gibi I/O işlemleri
-│ ├── pdf_utils.py # PDF dosyalarını ayrıştıran (parsing) fonksiyonlar
-│ └── rag_core.py # Hibrit arama (hybrid_search) ve skor normalleştirme mantığı
+│ ├── init.py                   # Yardımcı fonksiyonları import edilebilir hale getirir
+│ ├── config.py                 # Tüm konfigürasyonları, API anahtarlarını ve dosya yollarını yönetir
+│ ├── index_conf.py             # Pinecone indekslerini oluşturma, silme ve sorgulama fonksiyonları
+│ ├── index_manager.py          # Tüm veri işleme (ingestion) pipeline’ını (run_rebuild) yönetir
+│ ├── io_utils.py               # JSONL dosyalarına yazma gibi I/O işlemleri
+│ ├── pdf_utils.py              # PDF dosyalarını ayrıştıran (parsing) fonksiyonlar
+│ └── rag_core.py               # Hibrit arama (hybrid_search) ve skor normalleştirme mantığı
 │
-├── docs/ # (Dinamik) Yüklenecek PDF'lerin konulduğu klasör
-├── processed_docs/ # (Dinamik) İşlemi tamamlanan PDF'lerin taşındığı klasör
-├── saves/ # (Dinamik) İşleme sırasında üretilen ara dosyaların (chunks.jsonl, docs.jsonl vb.) kaydedildiği yer
-└── sparse_vectorizer/ # (Dinamik) Eğitilmiş TF-IDF modelinin (vectorizer.joblib) kaydedildiği yer
+├── docs/                       # (Dinamik) Yüklenecek PDF'lerin konulduğu klasör
+├── processed_docs/             # (Dinamik) İşlemi tamamlanan PDF'lerin taşındığı klasör
+├── saves/                      # (Dinamik) İşleme sırasında üretilen ara dosyaların (chunks.jsonl, docs.jsonl vb.) kaydedildiği yer
+└── sparse_vectorizer/          # (Dinamik) Eğitilmiş TF-IDF modelinin (vectorizer.joblib) kaydedildiği yer
 ```
