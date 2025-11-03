@@ -107,16 +107,15 @@ Projenin ana dizin yapısı ve önemli dosyaların açıklamaları aşağıdadı
 rag-llm/
 │
 ├── app.py                      # Gradio arayüzünü başlatan ve agent'ı yükleyen ana uygulama dosyası
-├── docker-compose.yml          # (Opsiyonel) Pinecone local test servislerini başlatmak için
 ├── README.md                   # Bu döküman
 │
 ├── pipeline/
-│ ├── init.py                   # Pipeline modüllerini import edilebilir hale getirir
+│ ├── __init__.py                   # Pipeline modüllerini import edilebilir hale getirir
 │ ├── chunking.py               # Anlamsal parçalama (semantic chunking) mantığını içerir
 │ └── contextualize.py          # LLM ile parçalara bağlam ekleme mantığını içerir
 │
 ├── utils/
-│ ├── init.py                   # Yardımcı fonksiyonları import edilebilir hale getirir
+│ ├── __init__.py                   # Yardımcı fonksiyonları import edilebilir hale getirir
 │ ├── config.py                 # Tüm konfigürasyonları, API anahtarlarını ve dosya yollarını yönetir
 │ ├── index_conf.py             # Pinecone indekslerini oluşturma, silme ve sorgulama fonksiyonları
 │ ├── index_manager.py          # Tüm veri işleme (ingestion) pipeline’ını (run_rebuild) yönetir
