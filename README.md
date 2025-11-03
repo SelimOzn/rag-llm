@@ -10,13 +10,13 @@ Sistem, bir LangChain Agent'ı ve Gradio arayüzü ile paketlenmiştir, bu sayed
 * **Anlamsal Parçalama (Semantic Chunking):** Metinleri sabit boyutlu parçalara bölmek yerine, anlamsal olarak ilişkili cümleleri (cümleler arası kosinüs benzerliğine göre) bir arada tutan bir `hybrid_chunker` kullanır.
 * **LLM ile Bağlamsallaştırma:** İndekslemeden *önce*, her bir metin parçasının (chunk) belge içindeki yerini daha iyi açıklaması için küçük bir LLM (`meta-llama/Llama-3.2-1B-Instruct`) kullanarak özet bir bağlam (context) üretilir ve bu, parçanın başına eklenir. Bu, arama sırasında alaka düzeyini önemli ölçüde artırır.
 * **Akıllı Agent:** Sorguları işlemek ve `DocumentHybridSearch` aracını akıllıca kullanmak için `ChatGoogleGenerativeAI` (Gemini) modeli ile güçlendirilmiş bir LangChain agent'ı içerir.
-* **Dinamik İndeksleme:** Gradio arayüzü üzerinden yeni PDF'ler yüklendiğinde tüm veri işleme (ingestion) pijplini (`run_rebuild`) otomatik olarak tetiklenir ve agent hafızada güncellenir.
+* **Dinamik İndeksleme:** Gradio arayüzü üzerinden yeni PDF'ler yüklendiğinde tüm veri işleme (ingestion) pipeline'ı (`run_rebuild`) otomatik olarak tetiklenir ve agent hafızada güncellenir.
 
 ## ⚙️ Mimari ve Veri Akışı
 
 Proje, iki ana aşamadan oluşur: **Veri İşleme (Ingestion)** ve **Sorgulama (Inference)**.
 
-### 1. Veri İşleme (Ingestion) Pijplini
+### 1. Veri İşleme (Ingestion) Pipeline'ı
 Yeni bir PDF yüklendiğinde (`app.py` -> `upload_and_reindex` -> `run_rebuild`):
 
 1.  **PDF Ayrıştırma:** PDF, `PyMuPDF` (fitz) kullanılarak başlıklarına (font kalınlığı ve boşluklara göre) ayrıştırılır ve `(başlık, içerik)` çiftleri olarak kaydedilir.
