@@ -1,4 +1,7 @@
 import json
+from tqdm import tqdm
+import gc
+import torch
 
 def add_context(chunk, docs, generator, prompt_template):
     # doc_id ve title ile eşleşen belgeyi bul
@@ -35,25 +38,58 @@ def add_context(chunk, docs, generator, prompt_template):
     return contexted_chunk
 
 
+def add_context_in_batch(chunks, docs, generator, prompt_template, batch_size=4):
 
+    doc_lookup = {}
+    for doc in docs:
+        if doc["doc_id"] not in doc_lookup:
+            doc_lookup[doc["doc_id"]] = {}
+        doc_lookup[doc["doc_id"]][doc["title"]] = doc["content"].strip()
 
+    prompts_to_process = []
+    valid_chunks = []
 
-"""
-import json
+    print(f"Toplu işlem için {len(chunks)} adet prompt hazırlanıyor...")
+    for chunk in chunks:
+        try:
+            doc_content = doc_lookup[chunk["doc_id"]][chunk["title"]]
+            chunk_text = chunk["chunk"].strip()
 
-def add_context(chunk_file_path, doc, model, prompt_template):
+            prompt_text = prompt_template.format(doc=doc_content, chunk=chunk_text)
+            prompts_to_process.append([{
+                "role":"user",
+                "content": prompt_text
+            }])
+            valid_chunks.append(chunk)
+        except KeyError:
+            print(f"Uyarı: Eşleşen doküman bulunamadı {chunk['doc_id']} - {chunk['title']}. Bu chunk atlanıyor.")
+            continue
+
+    print(f"Generator'a {len(prompts_to_process)} prompt gönderiliyor (batch_size={batch_size})...")
+    outputs = []
+
+    for i in tqdm(range(0,len(prompts_to_process), batch_size), desc="Context Batch İşleme"):
+        batch_outputs = generator(prompts_to_process[i:i+batch_size])
+        outputs.extend(batch_outputs)
+        del batch_outputs
+        gc.collect()
+        torch.cuda.empty_cache()
+
     contexted_chunks = []
-    with open(chunk_file_path, 'r') as file:
-        chunks = [json.loads(line) for line in file]
-        for chunk in chunks:
-            doc_id = chunk['doc_id']
-            prompt = prompt_template.format(doc=doc, chunk=chunk['chunk'])
-            contexted_text = model.generate(prompt=prompt)
-            contexted_chunk = {"doc_id":doc_id,
-                               "title":chunk['title'],
-                               "chunk_id":chunk['chunk_id'],
-                               "chunk":contexted_text}
-            contexted_chunks.append(contexted_chunk)
+    contexted_chunk_texts = []
 
-    return contexted_chunks
-"""
+    for chunk, output in zip(valid_chunks, outputs):
+        #answer = output["generated_text"][-1]["content"].strip()
+        answer = output[0]["generated_text"][-1]["content"].strip()
+        contexted_text = answer + " " + chunk["chunk"].strip()
+        contexted_chunks.append({
+            "doc_id": chunk["doc_id"],
+            "title": chunk["title"],
+            "chunk_id": chunk["chunk_id"],
+            "chunk": contexted_text
+        })
+        contexted_chunk_texts.append(contexted_text)
+
+    print(f"{len(contexted_chunks)} adet chunk başarıyla işlendi.")
+    return contexted_chunks, contexted_chunk_texts
+

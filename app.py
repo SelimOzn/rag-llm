@@ -66,8 +66,7 @@ try:
         max_new_tokens=100,
         temperature=0.7,
         top_p=0.9,
-        truncation=True
-    )
+        truncation=True)
     try:
         GLOBAL_STATE["vectorizer"] = joblib.load(config.VECTORIZER_FILE_PATH)
         rag_tool = create_rag_tool(GLOBAL_STATE["pc"],
@@ -92,30 +91,39 @@ except Exception as e:
 
 
 def respond(message, chat_history):
+    chat_history.append({"role":"user", "content": message})
+    if GLOBAL_STATE["agent"] is None:
+        chat_history.append({"role": "assistant",
+                             "content": "HATA: Sistem henüz indekslenmemiş. Lütfen sohbet kutusunun yanındaki 'Dosya Yükle' butonuyla bir PDF yükleyerek sistemi başlatın."})
+        return "", chat_history
+
     langchain_messages = []
-    for user_msg, ai_msg in chat_history:
-        langchain_messages.append(("user", user_msg))
-        langchain_messages.append(("assistant", ai_msg))
-    langchain_messages.append(("user", message))
+    for msg in chat_history:
+        if msg["role"] == "assistant":
+            langchain_messages.append(("assistant", msg["content"]))
+        elif msg["role"] == "user":
+            langchain_messages.append(("user", msg["content"]))
+
 
     print(f"\nYeni Sorgu Alındı: {message}")
     print(f"Tüm Konuşma Geçmişi: {langchain_messages}")
 
-    result = GLOBAL_STATE["agent"].invoke({
-        "messages": langchain_messages
-    })
-
-    final_answer = "Bir hata oluştu."
-    if message in result and result["message"]:
-        final_answer = result["message"][-1].content
-        chat_history.append(("assistant", final_answer))
+    try:
+        result = GLOBAL_STATE["agent"].invoke({
+            "messages": langchain_messages
+        })
+        final_answer = result["messages"][-1].content
+    except Exception as e:
+        print(f"Agent çalışırken bir hata oluştu: {e}")
+        final_answer = f"Bir hata oluştu: {e}"
 
     print(f"Agent Cevabı: {final_answer}")
-    return final_answer
+    chat_history.append({"role": "assistant", "content": final_answer})
+    return "", chat_history
 
 def upload_and_reindex(file, chat_history):
     if file is None:
-        chat_history.append((None, "Lütfen bir dosya seçin."))
+        chat_history.append({"role": "assistant", "content": "Lütfen bir dosya yükleyin."})
         return "", chat_history
 
     temp_path = file.name
@@ -126,12 +134,15 @@ def upload_and_reindex(file, chat_history):
         shutil.copy(temp_path, target_path)
         print(f"Dosya '{target_path}' konumuna kopyalandı.")
 
-        chat_history.append((f"({file_name} yüklendi)", "Dosya alındı. İndeksleme başlıyor... Bu işlem birkaç dakika sürebilir. Lütfen bekleyin..."))
+        chat_history.append({"role": "user", "content": f"({file_name} yüklendi)"})
+        chat_history.append({"role": "assistant",
+                             "content": "Dosya alındı. Tam indeksleme başlıyor... \
+                             Bu işlem birkaç dakika sürebilir. Lütfen bekleyin..."})
         yield "", chat_history
 
     except Exception as e:
         print(f"Dosya kopyalanamadı: {e}")
-        chat_history.append((None,f"Hata: Dosya kopyalanamadı: {e}"))
+        chat_history.append({"role":"assistant", "content":f"Hata: Dosya kopyalanamadı: {e}"})
         yield "", chat_history
         return
 
@@ -144,14 +155,16 @@ def upload_and_reindex(file, chat_history):
             GLOBAL_STATE["generator"]
         )
 
-        print("İndeksleme tamamlandır.")
-        chat_history.append((None, "İndeksleme tamamlandı. Modeller hafızada güncelleniyor..."))
+        print("İndeksleme tamamlandı.")
+        chat_history.append(
+            {"role": "assistant", "content": "İndeksleme tamamlandı. Modeller hafızada güncelleniyor..."})
         yield "", chat_history
+
     except Exception as e:
         print(f"İndeksleme hatası: {e}")
         import traceback
         traceback.print_exc()
-        chat_history.append((None, f"Hata: İndeksleme başarısız oldu.\n{e}"))
+        chat_history.append({"role": "assistant", "content": f"HATA: İndeksleme başarısız oldu.\n{e}"})
         yield "", chat_history
         return
 
@@ -171,12 +184,16 @@ def upload_and_reindex(file, chat_history):
         )
 
         print("Hafızadaki agent başarıyla güncellendi.")
-        chat_history.append((None, f"Sistem başarıyla güncellendi. Artık '{file_name}' hakkında soru sorabilirsiniz."))
+        chat_history.append({"role": "assistant",
+                             "content": f"Sistem başarıyla güncellendi. \
+                             Artık '{file_name}' hakkında soru sorabilirsiniz."})
         yield "", chat_history
 
     except Exception as e:
         print(f"Modeller yeniden yüklenirken hata oluştu: {e}")
-        chat_history.append((None, f"HATA: Modeller hafızaya yeniden yüklenemedi. Lütfen uygulamayı manuel olarak yeniden başlatın. Hata: {e}"))
+        chat_history.append({"role": "assistant",
+                             "content": f"HATA: Modeller hafızaya yeniden yüklenemedi. \
+                             Lütfen uygulamayı manuel olarak yeniden başlatın. Hata: {e}"})
         yield "", chat_history
 
 
@@ -188,19 +205,41 @@ if __name__ == "__main__":
         gr.Markdown("# Belge Sorgualama Agent'ı (RAG)")
         gr.Markdown("Sistemdeki belgelere sorular sorun veya yeni belgeler ekleyin.")
 
-        with gr.Tab("Sohbet"):
-            gr.ChatInterface(
-                fn=respond,
-                chatbot=gr.Chatbot(height=600, label="Sohbet Ekranı", type="messages"),
-                textbox=gr.Textbox(scale=7, container=False, placeholder="Lütfen sorunuzu buraya yazınız..."),
-                clear_btn="Konuşmayı Temizle"
-            )
+        chatbot = gr.Chatbot(
+            label="Sohbet Ekranı",
+            height=600,
+            type="messages"
+        )
 
-        with gr.Tab("Veritabanı Yönetimi (Admin)"):
-            gr.Markdown(
-                "**Yeni Belge Ekleme Adımları:**\n"
-                "1. PDF dosyasını seçin ve 'Dosyayı yükle' butonuna basın.\n"
-                "2. Yükleme başarılı olduktan sonra, 'Veritabanını Yeniden İndeksle' butonuna basın.\n"
-                "3. İndeksleme tamamlandığında, bu uygulamayı terminalden"
+        with gr.Row():
+            message_box = gr.Textbox(
+                placeholder="Lütfen sorunuzu buraya yazın veya bir dosya yükleyin...",
+                scale=7,
+                container=False
             )
+            upload_button = gr.UploadButton(
+                "Dosya Yükle (.pdf)",
+                file_types=[".pdf"],
+                scale=1
+            )
+        submit_button = gr.Button("Gönder", variant="primary")
+        submit_button.click(
+            fn=respond,
+            inputs=[message_box, chatbot],
+            outputs=[message_box, chatbot]
+        )
 
+        message_box.submit(
+            fn=respond,
+            inputs=[message_box, chatbot],
+            outputs=[message_box, chatbot]
+        )
+
+        upload_button.upload(
+            fn=upload_and_reindex,
+            inputs=[upload_button, chatbot],
+            outputs=[message_box, chatbot]
+        )
+
+    print("Gradio arayüzü başlatılıyor...")
+    demo.launch()

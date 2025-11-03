@@ -6,7 +6,7 @@ import numpy as np
 import joblib
 from tqdm import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
-from pipeline import add_context, concurrent_chunker
+from pipeline import add_context, concurrent_chunker, add_context_in_batch
 from utils import (split_pdf_by_title,
                    save_jsonl,
                    create_dense_index,
@@ -44,13 +44,22 @@ def run_rebuild(pc, tokenizer, embed_model, generator):
                                     max_tokens=config.MAX_TOKENS,
                                     similarity_threshold=config.SIMILARITY_THRESHOLD)
 
-        for chunk in chunks:
-            contexted_chunk = add_context(chunk, sections, generator, config.CONTEXT_MODEL_NAME)
-            contexted_text = contexted_chunk['chunk']
-            embedding = embed_model.encode(contexted_text, convert_to_numpy=True)
-            dense_index_upsert(pc, config.DENSE_INDEX_NAME, [embedding], [contexted_chunk])
-            save_jsonl([contexted_chunk], config.CONTEXTED_SAVE_PATH)
+        metadatas, contexted_texts = add_context_in_batch(chunks,
+                                                          sections,
+                                                          generator,
+                                                          config.CONTEXT_PROMPT_TEMPLATE,
+                                                          config.CONTEXT_BATCH_SIZE)
+        if not contexted_texts:
+            print(f"Hiçbir chunk işlenemedi (muhtemelen doküman eşleşme hatası).")
+            continue
 
+        print(f"TOPLU embedding hesaplanıyor ({len(contexted_texts)} adet)...")
+
+        embeddings = embed_model.encode(contexted_texts, convert_to_numpy=True)
+        print("TOPLU dense index yüklemesi yapılıyor...")
+        dense_index_upsert(pc, config.DENSE_INDEX_NAME, embeddings, metadatas)
+        print("TOPLU .jsonl kaydı yapılıyor...")
+        save_jsonl(metadatas, config.CONTEXTED_SAVE_PATH)
         shutil.move(doc_path, os.path.join(config.PROCESSED_DOCS_DIR, doc_file))
 
     print("TF-IDF Vectorizer eğitiliyor...")
