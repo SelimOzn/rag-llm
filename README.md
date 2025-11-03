@@ -50,7 +50,7 @@ Yeni bir PDF yüklendiğinde (`app.py` -> `upload_and_reindex` -> `run_rebuild`)
 
 ### 1. Ön Gereksinimler
 
-* Python 3.10+
+* Python 3.12
 * Pinecone Hesabı (API Key için)
 * Google AI Studio Hesabı (Gemini API Key için)
 * Hugging Face Hesabı (Llama modelleri için Token)
@@ -70,13 +70,8 @@ Yeni bir PDF yüklendiğinde (`app.py` -> `upload_and_reindex` -> `run_rebuild`)
     ```
 
 3.  **Bağımlılıkları yükleyin:**
-    *(Not: Projenizde bir `requirements.txt` dosyası oluşturmanız şiddetle tavsiye edilir. Aşağıdaki komut, bu dosyanın var olduğunu varsayar.)*
     ```bash
     pip install -r requirements.txt
-    ```
-    *Eğer `requirements.txt` dosyanız yoksa, başlıca kütüphaneleri manuel olarak yükleyin:*
-    ```bash
-    pip install langchain langchain-google-genai pinecone-client sentence-transformers transformers scikit-learn gradio pymupdf nltk torch joblib python-dotenv
     ```
 
 4.  **NLTK Verisini İndirin:**
@@ -103,3 +98,26 @@ Uygulamayı başlatmak için `app.py` dosyasını çalıştırın:
 
 ```bash
 python app.py
+```
+
+## 📂 Proje Yapısı
+
+Projenin ana dizin yapısı ve önemli dosyaların açıklamaları aşağıdadır. `docs`, `saves` gibi klasörler `config.py` içinde tanımlanmıştır ve uygulama çalıştırıldığında (`app.py`) otomatik olarak oluşturulur.
+```
+rag-llm/ │ ├── app.py # Gradio arayüzünü başlatan ve agent'ı yükleyen ana uygulama dosyası 
+├── docker-compose.yml # (Opsiyonel) Pinecone local test servislerini başlatmak için 
+├── README.md # Bu döküman │ 
+├── pipeline/ │ 
+├── init.py # Pipeline modüllerini import edilebilir hale getirir │ 
+├── chunking.py # Anlamsal parçalama (semantic chunking) mantığını içerir │ 
+└── contextualize.py # LLM ile parçalara bağlam ekleme mantığını içerir │ 
+├── utils/ │ 
+├── init.py # Yardımcı fonksiyonları import edilebilir hale getirir │ 
+├── config.py # Tüm konfigürasyonları, API anahtarlarını ve dosya yollarını yönetir │ 
+├── index_conf.py # Pinecone indekslerini oluşturma, silme ve sorgulama fonksiyonları │ 
+├── index_manager.py # Tüm veri işleme (ingestion) pijplinini (run_rebuild) yönetir │ 
+├── io_utils.py # JSONL dosyalarına yazma gibi I/O işlemleri │ 
+├── pdf_utils.py # PDF dosyalarını ayrıştıran (parsing) fonksiyonlar │ 
+└── rag_core.py # Hibrit arama (hybrid_search) ve skor normalleştirme mantığı 
+│ ├── docs/ # (Dinamik) Yüklenecek PDF'lerin konulduğu klasör ├── processed_docs/ # (Dinamik) İşlemi tamamlanan PDF'lerin taşındığı klasör ├── saves/ # (Dinamik) İşleme sırasında üretilen ara dosyaların (chunks.jsonl, docs.jsonl vb.) kaydedildiği yer └── sparse_vectorizer/ # (Dinamik) Eğitilmiş TF-IDF modelinin (vectorizer.joblib) kaydedildiği yer
+```
