@@ -50,6 +50,24 @@ def create_rag_tool(
     )
     return doc_search_tool
 
+def clear_and_recreate_dirs():
+    print("Geçici çalışma dizinleri temizleniyor...")
+    path_to_clean = [config.DOC_DIR_PATH,
+                     config.PROCESSED_DOCS_DIR,
+                     config.SAVES_DIR]
+
+    for path in path_to_clean:
+        try:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+            os.makedirs(path, exist_ok=True)
+            print(f"{path} klasörü yeniden oluşturuldu.")
+        except Exception as e:
+            print(f"{path} klasörü silinirken bir hata oluştu: {e}")
+
+    print("Temizlik tamamlandı.")
+
+clear_and_recreate_dirs()
 print("Global state (modeller, agent) yükleniyor... Lütfen bekleyin.")
 GLOBAL_STATE: Dict[str, Any] = {}
 
